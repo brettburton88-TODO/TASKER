@@ -926,6 +926,12 @@ function loadJSON() {
 
 // ── TODAY VIEW ──
 let todayViewActive = false;
+let focusModeActive = false;
+
+function toggleFocusMode() {
+  focusModeActive = !focusModeActive;
+  renderTodayView();
+}
 
 function toggleTodayView() {
   todayViewActive = !todayViewActive;
@@ -936,10 +942,10 @@ function toggleTodayView() {
     btn.classList.add('active');
     grid.classList.add('hidden');
     todayView.classList.add('active');
-    // Update summary to today stats
     renderTodayView();
     updateTodaySummary();
   } else {
+    focusModeActive = false;
     btn.classList.remove('active');
     grid.classList.remove('hidden');
     todayView.classList.remove('active');
@@ -980,11 +986,66 @@ function renderTodayView() {
   header.className = 'today-header';
   header.innerHTML = `
     <div style="font-size:0.9rem;font-weight:600;color:var(--text);">Today's tasks</div>
-    <div class="today-progress"><span>${doneToday}</span> of ${allToday.length} done</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="today-progress"><span>${doneToday}</span> of ${allToday.length} done</div>
+      <button id="focus-btn" onclick="toggleFocusMode()" class="${focusModeActive?'active':''}">✦ ${focusModeActive?'Exit focus':'Focus mode'}</button>
+    </div>
   `;
   view.appendChild(header);
 
-  // Domain sections
+  // Focus view (clean card)
+  const focusDiv = document.createElement('div');
+  focusDiv.className = 'focus-view' + (focusModeActive ? ' active' : '');
+  focusDiv.id = 'focus-view';
+  let focusHtml = `<div class="focus-date">${new Date().toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>`;
+  todayDomains.forEach(domain => {
+    const realDi = data.domains.findIndex(d => d.id === domain.id);
+    focusHtml += `<div class="focus-domain">${domain.label}</div>`;
+    domain.tasks.forEach(task => {
+      const ti = data.domains[realDi].tasks.indexOf(task);
+      const stateClass = STATES[task.state];
+      focusHtml += `<div class="focus-task${task.state===2?' done-task':''}" data-di="${realDi}" data-ti="${ti}">
+        <div class="state-box ${stateClass}" style="flex-shrink:0;margin-top:2px;"></div>
+        <span class="focus-task-text">${task.text}</span>
+      </div>`;
+    });
+  });
+  focusHtml += `<div class="focus-footer"><span>${doneToday}</span> of ${allToday.length} tasks done today</div>`;
+  focusDiv.innerHTML = focusHtml;
+
+  // Wire focus checkboxes
+  focusDiv.querySelectorAll('.state-box').forEach(box => {
+    box.addEventListener('click', e => {
+      e.stopPropagation();
+      const row = box.closest('.focus-task');
+      const di = parseInt(row.dataset.di);
+      const ti = parseInt(row.dataset.ti);
+      const task = data.domains[di].tasks[ti];
+      const prev = task.state;
+      task.state = (task.state + 1) % 3;
+      if (task.state === 2) task.completedAt = Date.now();
+      else if (prev === 2) task.completedAt = null;
+      renderTodayView(); updateTodaySummary(); markUnsaved();
+    });
+  });
+
+  // Wire focus task text to open panel
+  focusDiv.querySelectorAll('.focus-task-text').forEach(txt => {
+    txt.addEventListener('click', () => {
+      const row = txt.closest('.focus-task');
+      openPanel(parseInt(row.dataset.di), parseInt(row.dataset.ti));
+    });
+  });
+
+  view.appendChild(focusDiv);
+
+  // Normal today view wrapper
+  const normalDiv = document.createElement('div');
+  normalDiv.id = 'normal-today-view';
+  normalDiv.style.display = focusModeActive ? 'none' : 'block';
+  view.appendChild(normalDiv);
+
+  // Domain sections — into normal view
   todayDomains.forEach(domain => {
     const realDi = data.domains.findIndex(d => d.id === domain.id);
     const accent = ACCENT[domain.label] || '#6B7280';
@@ -995,14 +1056,12 @@ function renderTodayView() {
     domainLabel.style.color = accent;
     domainLabel.textContent = domain.label;
     section.appendChild(domainLabel);
-
     domain.tasks.forEach(task => {
       const ti = data.domains[realDi].tasks.indexOf(task);
       const row = buildTaskRow(task, realDi, ti, accent);
       section.appendChild(row);
     });
-
-    view.appendChild(section);
+    normalDiv.appendChild(section);
   });
 }
 
