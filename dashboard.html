@@ -272,6 +272,25 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
   /* Mobile today view */
   .m-today-empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
 }
+
+  /* TODAY VIEW */
+  #today-view { display: none !important; }
+  #today-view.active { display: block !important; max-width: 640px; }
+  #today-view-btn.active { background: #f0fdf4; border-color: #bbf7d0; color: #16a34a; font-weight: 600; }
+  .today-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 10px; border-bottom: 1.5px solid var(--border); }
+  .today-progress { font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--muted); }
+  .today-progress span { color: #16a34a; font-weight: 600; }
+  .today-domain-section { margin-bottom: 1.25rem; }
+  .today-domain-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0 0 6px; border-bottom: 0.5px solid var(--border); margin-bottom: 2px; }
+  .today-task-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+  .today-task-row:last-child { border-bottom: none; }
+  .today-task-row.done-task .today-task-text { text-decoration: line-through; opacity: 0.4; }
+  .today-task-text { flex: 1; font-size: 0.85rem; line-height: 1.4; color: var(--text); cursor: pointer; }
+  .today-task-text:hover { color: #16a34a; }
+  .today-task-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .today-effort { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: #1d4ed8; background: #eff6ff; padding: 1px 6px; border-radius: 4px; }
+  .today-empty { text-align: center; padding: 4rem 2rem; color: var(--muted); font-size: 0.9rem; line-height: 1.8; }
+  .today-empty strong { display: block; font-size: 1.1rem; color: var(--text); margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -934,13 +953,13 @@ function toggleTodayView() {
   const todayView = document.getElementById('today-view');
   if (todayViewActive) {
     btn.classList.add('active');
-    grid.classList.add('hidden');
+    grid.style.display='none';
     todayView.classList.add('active');
     renderTodayView();
     updateTodaySummary();
   } else {
     btn.classList.remove('active');
-    grid.classList.remove('hidden');
+    grid.style.display='';
     todayView.classList.remove('active');
     updateSummary();
     render();
