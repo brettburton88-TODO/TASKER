@@ -280,7 +280,10 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
 <div class="desktop-view" id="desktop-view">
   <header>
     <h1>Brett's Task Dashboard</h1>
-    <span class="date" id="today-date"></span>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="date" id="today-date"></span>
+      <button id="today-view-btn" onclick="toggleTodayView()" style="background:var(--bg);border:0.5px solid var(--border);border-radius:8px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:500;cursor:pointer;color:var(--muted);transition:all 0.15s;">📅 Today</button>
+    </div>
   </header>
   <div class="summary">
     <div class="metric"><div class="metric-label">Total tasks</div><div class="metric-value" id="m-total">—</div></div>
@@ -289,6 +292,7 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
     <div class="metric"><div class="metric-label">Hot 🔥</div><div class="metric-value orange" id="m-hot">—</div></div>
   </div>
   <div class="grid" id="grid"></div>
+  <div class="today-view" id="today-view"></div>
 
   <!-- Side Panel -->
   <div class="side-panel" id="side-panel">
@@ -920,6 +924,88 @@ function loadJSON() {
   input.click();
 }
 
+// ── TODAY VIEW ──
+let todayViewActive = false;
+
+function toggleTodayView() {
+  todayViewActive = !todayViewActive;
+  const btn = document.getElementById('today-view-btn');
+  const grid = document.getElementById('grid');
+  const todayView = document.getElementById('today-view');
+  if (todayViewActive) {
+    btn.classList.add('active');
+    grid.classList.add('hidden');
+    todayView.classList.add('active');
+    // Update summary to today stats
+    renderTodayView();
+    updateTodaySummary();
+  } else {
+    btn.classList.remove('active');
+    grid.classList.remove('hidden');
+    todayView.classList.remove('active');
+    updateSummary();
+    render();
+  }
+}
+
+function updateTodaySummary() {
+  let total=0, done=0, hot=0;
+  data.domains.forEach(d => d.tasks.forEach(t => {
+    if (t.today && t.state !== 2) { total++; if (t.hot) hot++; }
+    if (t.today && t.state === 2) done++;
+  }));
+  document.getElementById('m-total').textContent = total + done;
+  document.getElementById('m-done').textContent = done;
+  document.getElementById('m-remain').textContent = total;
+  document.getElementById('m-hot').textContent = hot;
+}
+
+function renderTodayView() {
+  const view = document.getElementById('today-view');
+  view.innerHTML = '';
+
+  const todayDomains = data.domains.map(d => ({
+    ...d, tasks: d.tasks.filter(t => t.today)
+  })).filter(d => d.tasks.length > 0);
+
+  if (!todayDomains.length) {
+    view.innerHTML = '<div class="today-empty"><strong>No tasks selected for today</strong>Click 📅 on any task to add it to your today list</div>';
+    return;
+  }
+
+  // Progress header
+  const allToday = data.domains.flatMap(d => d.tasks.filter(t => t.today));
+  const doneToday = allToday.filter(t => t.state === 2).length;
+  const header = document.createElement('div');
+  header.className = 'today-header';
+  header.innerHTML = `
+    <div style="font-size:0.9rem;font-weight:600;color:var(--text);">Today's tasks</div>
+    <div class="today-progress"><span>${doneToday}</span> of ${allToday.length} done</div>
+  `;
+  view.appendChild(header);
+
+  // Domain sections
+  todayDomains.forEach(domain => {
+    const realDi = data.domains.findIndex(d => d.id === domain.id);
+    const accent = ACCENT[domain.label] || '#6B7280';
+    const section = document.createElement('div');
+    section.className = 'today-domain-section';
+    const domainLabel = document.createElement('div');
+    domainLabel.className = 'today-domain-label';
+    domainLabel.style.color = accent;
+    domainLabel.textContent = domain.label;
+    section.appendChild(domainLabel);
+
+    domain.tasks.forEach(task => {
+      const ti = data.domains[realDi].tasks.indexOf(task);
+      const row = buildTaskRow(task, realDi, ti, accent);
+      section.appendChild(row);
+    });
+
+    view.appendChild(section);
+  });
+}
+
 // ── GOOGLE DRIVE SYNC ──
 const GDRIVE_CLIENT_ID = '83535002234-j7mit28vua00t3klb5gid9hb6auosaot.apps.googleusercontent.com';
 const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -1032,6 +1118,7 @@ function setStatus(msg) {
 const _origMarkUnsaved = markUnsaved;
 function markUnsaved() {
   _origMarkUnsaved();
+  if (todayViewActive) { renderTodayView(); updateTodaySummary(); }
   if (gdriveReady) {
     clearTimeout(window._autoSaveTimer);
     window._autoSaveTimer = setTimeout(() => gdriveSave(), 3000);
