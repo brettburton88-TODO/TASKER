@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Brett's Task Dashboard</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
 
@@ -338,9 +340,11 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
   <!-- Save bar -->
   <div class="save-bar">
     <span class="save-status" id="save-status"></span>
-    <button class="load-btn" onclick="loadJSON()">Load JSON</button>
     <button class="load-btn" onclick="printToday()" style="color:#16a34a;border-color:#bbf7d0;">🗓 Print Today</button>
-    <button class="save-btn" onclick="saveJSON()">Save JSON</button>
+    <button class="load-btn" id="gdrive-btn" onclick="gdriveConnect()">☁️ Connect Google Drive</button>
+    <button class="save-btn" id="gdrive-save-btn" onclick="gdriveSave()" style="display:none;">☁️ Save to Drive</button>
+    <button class="load-btn" onclick="loadJSON()" style="font-size:0.68rem;color:var(--muted);">↑ Local JSON</button>
+    <button class="load-btn" onclick="saveJSON()" style="font-size:0.68rem;color:var(--muted);">↓ Local JSON</button>
   </div>
 </div>
 
@@ -414,9 +418,11 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
   <!-- Mobile menu -->
   <div class="m-menu" id="m-menu">
     <button class="m-menu-close" onclick="toggleMobileMenu()">×</button>
-    <div class="m-menu-item" onclick="loadJSON();toggleMobileMenu()">📂 Load JSON</div>
-    <div class="m-menu-item" onclick="saveJSON();toggleMobileMenu()">💾 Save JSON</div>
+    <div class="m-menu-item" onclick="gdriveConnect();toggleMobileMenu()">☁️ Connect Google Drive</div>
+    <div class="m-menu-item" id="m-gdrive-save" onclick="gdriveSave();toggleMobileMenu()" style="display:none;">☁️ Save to Drive</div>
     <div class="m-menu-item" onclick="printToday();toggleMobileMenu()">🗓 Print Today</div>
+    <div class="m-menu-item" onclick="loadJSON();toggleMobileMenu()" style="font-size:0.82rem;color:var(--muted);">↑ Load local JSON</div>
+    <div class="m-menu-item" onclick="saveJSON();toggleMobileMenu()" style="font-size:0.82rem;color:var(--muted);">↓ Save local JSON</div>
   </div>
 </div>
 
@@ -912,6 +918,124 @@ function loadJSON() {
     reader.readAsText(file);
   };
   input.click();
+}
+
+// ── GOOGLE DRIVE SYNC ──
+const GDRIVE_CLIENT_ID = '83535002234-j7mit28vua00t3klb5gid9hb6auosaot.apps.googleusercontent.com';
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const GDRIVE_FILENAME = 'brett-tasks.json';
+let gdriveFileId = null;
+let gdriveAccessToken = null;
+let gdriveReady = false;
+
+function gdriveConnect() {
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GDRIVE_CLIENT_ID,
+    scope: GDRIVE_SCOPE,
+    callback: async (resp) => {
+      if (resp.error) { setStatus('Google Drive error: ' + resp.error); return; }
+      gdriveAccessToken = resp.access_token;
+      gdriveReady = true;
+      setStatus('☁️ Connected to Google Drive — loading tasks…');
+      await gdriveLoad();
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function gdriveLoad() {
+  try {
+    // Search for existing file
+    const search = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${GDRIVE_FILENAME}'+and+trashed=false&fields=files(id,name)`,
+      { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
+    );
+    const result = await search.json();
+    if (result.files && result.files.length > 0) {
+      gdriveFileId = result.files[0].id;
+      // Load content
+      const fileResp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${gdriveFileId}?alt=media`,
+        { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
+      );
+      const loaded = await fileResp.json();
+      // Migrate
+      loaded.domains.forEach(d => d.tasks.forEach(t => {
+        if (typeof t.done !== 'undefined') { t.state = t.done ? 2 : 0; delete t.done; }
+        if (!t.subtasks) t.subtasks = [];
+        if (!t.repeat) t.repeat = '';
+        if (!t.notes) t.notes = '';
+        if (!t.hot) t.hot = false;
+        if (!t.due) t.due = '';
+        if (t.completedAt === undefined) t.completedAt = null;
+        if (t.today === undefined) t.today = false;
+      }));
+      data = loaded;
+      checkDailyReset();
+      render(); updateSummary();
+      setStatus('☁️ Loaded from Google Drive ✓');
+    } else {
+      // No file yet — save current data
+      setStatus('☁️ No file found — saving current tasks to Drive…');
+      await gdriveSave();
+    }
+    // Show save button, hide connect button
+    const saveBtn = document.getElementById('gdrive-save-btn');
+    const connectBtn = document.getElementById('gdrive-btn');
+    const mSaveBtn = document.getElementById('m-gdrive-save');
+    if (saveBtn) { saveBtn.style.display = 'inline-flex'; }
+    if (connectBtn) { connectBtn.style.display = 'none'; }
+    if (mSaveBtn) { mSaveBtn.style.display = 'flex'; }
+  } catch(e) {
+    setStatus('Drive load error: ' + e.message);
+  }
+}
+
+async function gdriveSave() {
+  if (!gdriveAccessToken) { gdriveConnect(); return; }
+  try {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    let url, method;
+    if (gdriveFileId) {
+      url = `https://www.googleapis.com/upload/drive/v3/files/${gdriveFileId}?uploadType=media`;
+      method = 'PATCH';
+    } else {
+      // Create new file
+      const meta = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${gdriveAccessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: GDRIVE_FILENAME, mimeType: 'application/json' })
+      });
+      const metaResult = await meta.json();
+      gdriveFileId = metaResult.id;
+      url = `https://www.googleapis.com/upload/drive/v3/files/${gdriveFileId}?uploadType=media`;
+      method = 'PATCH';
+    }
+    await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${gdriveAccessToken}`, 'Content-Type': 'application/json' },
+      body: blob
+    });
+    setStatus('☁️ Saved to Google Drive ✓ ' + new Date().toLocaleTimeString('en-AU'));
+  } catch(e) {
+    setStatus('Drive save error: ' + e.message);
+  }
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('save-status');
+  if (el) el.textContent = msg;
+}
+
+// Override markUnsaved to auto-save if connected
+const _origMarkUnsaved = markUnsaved;
+function markUnsaved() {
+  _origMarkUnsaved();
+  if (gdriveReady) {
+    clearTimeout(window._autoSaveTimer);
+    window._autoSaveTimer = setTimeout(() => gdriveSave(), 3000);
+  }
 }
 
 // ── INIT ──
