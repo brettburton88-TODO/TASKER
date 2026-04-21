@@ -1069,9 +1069,46 @@ function renderTodayView() {
 const GDRIVE_CLIENT_ID = '83535002234-j7mit28vua00t3klb5gid9hb6auosaot.apps.googleusercontent.com';
 const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const GDRIVE_FILENAME = 'brett-tasks.json';
+const GDRIVE_TOKEN_KEY = 'brett_gdrive_token';
+const GDRIVE_TOKEN_EXP_KEY = 'brett_gdrive_token_exp';
 let gdriveFileId = null;
 let gdriveAccessToken = null;
 let gdriveReady = false;
+
+function saveToken(token) {
+  try {
+    localStorage.setItem(GDRIVE_TOKEN_KEY, token);
+    localStorage.setItem(GDRIVE_TOKEN_EXP_KEY, Date.now() + 55 * 60 * 1000);
+  } catch(e) {}
+}
+
+function loadStoredToken() {
+  try {
+    const token = localStorage.getItem(GDRIVE_TOKEN_KEY);
+    const exp = parseInt(localStorage.getItem(GDRIVE_TOKEN_EXP_KEY) || '0');
+    if (token && Date.now() < exp) return token;
+  } catch(e) {}
+  return null;
+}
+
+function clearStoredToken() {
+  try {
+    localStorage.removeItem(GDRIVE_TOKEN_KEY);
+    localStorage.removeItem(GDRIVE_TOKEN_EXP_KEY);
+  } catch(e) {}
+}
+
+async function gdriveAutoConnect() {
+  const stored = loadStoredToken();
+  if (stored) {
+    gdriveAccessToken = stored;
+    gdriveReady = true;
+    setStatus('☁️ Reconnecting to Google Drive…');
+    await gdriveLoad();
+    return true;
+  }
+  return false;
+}
 
 function gdriveConnect() {
   const client = google.accounts.oauth2.initTokenClient({
@@ -1081,6 +1118,7 @@ function gdriveConnect() {
       if (resp.error) { setStatus('Google Drive error: ' + resp.error); return; }
       gdriveAccessToken = resp.access_token;
       gdriveReady = true;
+      saveToken(resp.access_token);
       setStatus('☁️ Connected to Google Drive — loading tasks…');
       await gdriveLoad();
     }
@@ -1131,8 +1169,20 @@ async function gdriveLoad() {
     if (saveBtn) { saveBtn.style.display = 'inline-flex'; }
     if (connectBtn) { connectBtn.style.display = 'none'; }
     if (mSaveBtn) { mSaveBtn.style.display = 'flex'; }
+    // Update connect button text to show connected state
+    if (connectBtn) { connectBtn.textContent = '☁️ Connected'; }
   } catch(e) {
-    setStatus('Drive load error: ' + e.message);
+    if (e.message && e.message.includes('401')) {
+      clearStoredToken();
+      setStatus('Session expired — click Connect to sign in again');
+      gdriveReady = false;
+      const btn = document.getElementById('gdrive-btn');
+      const saveBtn = document.getElementById('gdrive-save-btn');
+      if (btn) btn.style.display = 'inline-flex';
+      if (saveBtn) saveBtn.style.display = 'none';
+    } else {
+      setStatus('Drive load error: ' + e.message);
+    }
   }
 }
 
@@ -1191,6 +1241,14 @@ document.getElementById('m-today-date').textContent=new Date().toLocaleDateStrin
 checkDailyReset();
 render();
 updateSummary();
+
+// Auto-connect Google Drive if token is stored
+window.addEventListener('load', async () => {
+  const connected = await gdriveAutoConnect();
+  if (!connected) {
+    setStatus('Click ☁️ Connect Google Drive to load your tasks');
+  }
+});
 
 window.addEventListener('resize',()=>{render();updateSummary();});
 </script>

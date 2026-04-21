@@ -250,6 +250,39 @@ function getTaskKey(domain, text) {
 }
 
 // ── GOOGLE DRIVE ──
+const TOKEN_KEY = 'brett_gdrive_token';
+const TOKEN_EXP_KEY = 'brett_gdrive_token_exp';
+
+function saveToken(token) {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_EXP_KEY, Date.now() + 55 * 60 * 1000);
+  } catch(e) {}
+}
+
+function loadStoredToken() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const exp = parseInt(localStorage.getItem(TOKEN_EXP_KEY) || '0');
+    if (token && Date.now() < exp) return token;
+  } catch(e) {}
+  return null;
+}
+
+async function autoConnect() {
+  const stored = loadStoredToken();
+  if (stored) {
+    gdriveToken = stored;
+    document.getElementById('gdrive-btn').textContent = '☁️ Connected';
+    document.getElementById('gdrive-btn').style.color = '#16a34a';
+    document.getElementById('connect-banner').style.display = 'none';
+    setStatus('Reconnecting…');
+    await loadAllData();
+    return true;
+  }
+  return false;
+}
+
 function gdriveConnect() {
   const client = google.accounts.oauth2.initTokenClient({
     client_id: GDRIVE_CLIENT_ID,
@@ -257,6 +290,7 @@ function gdriveConnect() {
     callback: async (resp) => {
       if (resp.error) { setStatus('Error: ' + resp.error); return; }
       gdriveToken = resp.access_token;
+      saveToken(resp.access_token);
       document.getElementById('gdrive-btn').textContent = '☁️ Connected';
       document.getElementById('gdrive-btn').style.color = '#16a34a';
       document.getElementById('connect-banner').style.display = 'none';
@@ -703,6 +737,12 @@ function init() {
 }
 
 init();
+window.addEventListener('load', async () => {
+  const connected = await autoConnect();
+  if (!connected) {
+    document.getElementById('connect-banner').style.display = 'block';
+  }
+});
 </script>
 </body>
 </html>
