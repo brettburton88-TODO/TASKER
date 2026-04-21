@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brett's Weekly Planner</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #f5f3ef; --surface: #fff; --border: #e2ddd6;
+  --text: #1a1814; --muted: #8a8378;
+  --green: #16a34a; --amber: #d97706; --red: #dc2626;
+  --blue: #2563eb; --purple: #7c3aed;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 2rem 6rem; }
+
+header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1.5px solid var(--border); }
+h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
+.subtitle { font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--muted); }
+
+/* VIEW TABS */
+.view-tabs { display: flex; gap: 8px; margin-bottom: 1.75rem; }
+.view-tab { padding: 7px 18px; border-radius: 8px; border: 0.5px solid var(--border); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 500; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+.view-tab.active { background: var(--text); color: white; border-color: var(--text); }
+.view-tab:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+/* CAPACITY BAR */
+.capacity-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+.capacity-field { display: flex; align-items: center; gap: 10px; }
+.capacity-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 500; }
+.capacity-input { width: 70px; border: 0.5px solid var(--border); border-radius: 7px; padding: 6px 10px; font-family: 'DM Mono', monospace; font-size: 0.9rem; color: var(--text); background: var(--bg); outline: none; text-align: center; }
+.capacity-input:focus { border-color: #94a3b8; }
+.capacity-bar-wrap { flex: 1; min-width: 200px; }
+.capacity-bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+.capacity-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+.capacity-status { font-family: 'DM Mono', monospace; font-size: 0.75rem; }
+.capacity-status.green { color: var(--green); }
+.capacity-status.amber { color: var(--amber); }
+.capacity-status.red { color: var(--red); }
+
+/* WEEK SELECTOR */
+.week-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; }
+.week-label { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted); }
+.week-nav { background: none; border: 0.5px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.9rem; color: var(--muted); }
+.week-nav:hover { background: var(--bg); color: var(--text); }
+.week-current { font-size: 0.85rem; font-weight: 500; color: var(--text); }
+
+/* DOMAIN SECTIONS */
+.domain-section { margin-bottom: 1.5rem; }
+.domain-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-radius: 8px 8px 0 0; border: 0.5px solid var(--border); border-bottom: none; }
+.domain-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.domain-total { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+
+.task-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 0.5px solid var(--border); border-radius: 0 0 10px 10px; overflow: hidden; }
+.task-table th { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 6px 14px; background: var(--bg); border-bottom: 0.5px solid var(--border); text-align: left; font-weight: 500; }
+.task-table th.right { text-align: right; }
+.task-table th.center { text-align: center; }
+.task-row { border-bottom: 0.5px solid var(--border); transition: background 0.1s; }
+.task-row:last-child { border-bottom: none; }
+.task-row:hover { background: #fafaf8; }
+.task-row.done-task { opacity: 0.4; }
+.task-row.big-rock { border-left: 3px solid var(--amber); }
+
+.task-table td { padding: 9px 14px; font-size: 0.82rem; vertical-align: middle; }
+.task-name { color: var(--text); line-height: 1.35; }
+.task-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.tag { font-size: 0.6rem; font-family: 'DM Mono', monospace; padding: 1px 5px; border-radius: 3px; }
+.tag-hot { background: #fff7ed; color: #c2410c; border: 0.5px solid #fed7aa; }
+.tag-effort { background: #eff6ff; color: #1d4ed8; }
+.tag-due-soon { background: #fffbeb; color: #92400e; border: 0.5px solid #fcd34d; }
+.tag-due-late { background: #fef2f2; color: #991b1b; border: 0.5px solid #fecaca; }
+
+.hrs-input { width: 65px; border: 0.5px solid var(--border); border-radius: 6px; padding: 5px 8px; font-family: 'DM Mono', monospace; font-size: 0.82rem; color: var(--text); background: var(--bg); outline: none; text-align: center; }
+.hrs-input:focus { border-color: #94a3b8; }
+.hrs-input.has-value { background: #eff6ff; border-color: #93c5fd; }
+
+.rock-btn { background: none; border: 1.5px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 11px; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
+.rock-btn.active { background: #fffbeb; border-color: #fcd34d; color: var(--amber); font-weight: 600; }
+.rock-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* VARIANCE INDICATORS */
+.variance { font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+.variance.green { background: #f0fdf4; color: var(--green); }
+.variance.amber { background: #fffbeb; color: var(--amber); }
+.variance.red { background: #fef2f2; color: var(--red); }
+.variance.neutral { background: var(--bg); color: var(--muted); }
+
+/* SUMMARY CARDS */
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+.summary-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.summary-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+.summary-value { font-size: 1.5rem; font-weight: 600; font-family: 'DM Mono', monospace; }
+.summary-value.green { color: var(--green); }
+.summary-value.amber { color: var(--amber); }
+.summary-value.red { color: var(--red); }
+
+/* HISTORY TABLE */
+.history-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+.history-table th { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 8px 14px; background: var(--bg); border-bottom: 0.5px solid var(--border); text-align: left; }
+.history-table td { padding: 10px 14px; font-size: 0.82rem; border-bottom: 0.5px solid var(--border); }
+.history-table tr:last-child td { border-bottom: none; }
+.accuracy-pill { font-family: 'DM Mono', monospace; font-size: 0.72rem; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+
+/* SAVE BAR */
+.save-bar { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; gap: 8px; align-items: center; z-index: 40; }
+.save-btn { background: var(--text); color: white; border: none; padding: 8px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+.save-btn:hover { opacity: 0.8; }
+.load-btn { background: var(--surface); color: var(--text); border: 0.5px solid var(--border); padding: 8px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; cursor: pointer; }
+.load-btn:hover { background: var(--bg); }
+.save-status { font-size: 0.72rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+.empty-state { text-align: center; padding: 3rem; color: var(--muted); font-size: 0.88rem; line-height: 1.8; }
+.empty-state strong { display: block; font-size: 1rem; color: var(--text); margin-bottom: 8px; }
+
+.no-tasks { padding: 12px 14px; font-size: 0.78rem; color: var(--muted); font-style: italic; }
+
+/* Connect banner */
+.connect-banner { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1.5rem; }
+.connect-banner h2 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+.connect-banner p { font-size: 0.82rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.6; }
+.connect-big-btn { background: var(--text); color: white; border: none; padding: 10px 24px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+.connect-big-btn:hover { opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Brett's Weekly Planner</h1>
+    <div class="subtitle" id="week-subtitle">Loading…</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="https://brettburton88-todo.github.io/TASKER/dashboard.html" style="font-size:0.75rem;color:var(--muted);text-decoration:none;border:0.5px solid var(--border);padding:5px 12px;border-radius:7px;">← TASKER</a>
+  </div>
+</header>
+
+<div class="view-tabs">
+  <button class="view-tab active" onclick="switchView('plan')">📋 Plan</button>
+  <button class="view-tab" onclick="switchView('review')">✅ Review</button>
+  <button class="view-tab" onclick="switchView('history')">📊 History</button>
+</div>
+
+<div id="connect-banner" class="connect-banner" style="display:none;">
+  <h2>Connect Google Drive</h2>
+  <p>Sign in to load your tasks from TASKER and save your weekly plans.<br>Uses the same Google account as your TASKER dashboard.</p>
+  <button class="connect-big-btn" onclick="gdriveConnect()">☁️ Connect Google Drive</button>
+</div>
+
+<!-- PLAN VIEW -->
+<div id="plan-view">
+  <div class="capacity-card">
+    <div class="capacity-field">
+      <span class="capacity-label">Available hours</span>
+      <input type="number" class="capacity-input" id="available-hrs" value="30" min="1" max="80" onchange="updateCapacity()" />
+    </div>
+    <div class="capacity-field">
+      <span class="capacity-label">Committed</span>
+      <span class="capacity-input" id="committed-hrs" style="display:inline-block;cursor:default;">0</span>
+    </div>
+    <div class="capacity-bar-wrap">
+      <div class="capacity-bar-track"><div class="capacity-bar-fill" id="capacity-fill" style="width:0%;background:var(--green);"></div></div>
+      <div class="capacity-status green" id="capacity-status">0 of 30 hours committed</div>
+    </div>
+  </div>
+
+  <div class="week-bar">
+    <button class="week-nav" onclick="changeWeek(-1)">‹</button>
+    <span class="week-current" id="plan-week-label">Week of …</span>
+    <button class="week-nav" onclick="changeWeek(1)">›</button>
+  </div>
+
+  <div id="plan-content"></div>
+</div>
+
+<!-- REVIEW VIEW -->
+<div id="review-view" style="display:none;">
+  <div class="summary-grid" id="review-summary"></div>
+  <div class="week-bar">
+    <button class="week-nav" onclick="changeWeek(-1)">‹</button>
+    <span class="week-current" id="review-week-label">Week of …</span>
+    <button class="week-nav" onclick="changeWeek(1)">›</button>
+  </div>
+  <div id="review-content"></div>
+</div>
+
+<!-- HISTORY VIEW -->
+<div id="history-view" style="display:none;">
+  <div id="history-content"></div>
+</div>
+
+<div class="save-bar">
+  <span class="save-status" id="save-status"></span>
+  <button class="load-btn" id="gdrive-btn" onclick="gdriveConnect()">☁️ Connect Drive</button>
+  <button class="save-btn" onclick="savePlan()">Save Plan</button>
+</div>
+
+<script>
+const GDRIVE_CLIENT_ID = '83535002234-j7mit28vua00t3klb5gid9hb6auosaot.apps.googleusercontent.com';
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const TASKS_FILENAME = 'brett-tasks.json';
+const PLAN_FILENAME = 'brett-plan.json';
+
+const ACCENT = { HABAS:'#1D9E75', SIS:'#2563EB', HOME:'#D97706', CONSEP:'#7C3AED', 'BCRB-BIZ':'#6B7280' };
+
+let gdriveToken = null;
+let tasksFileId = null;
+let planFileId = null;
+let tasksData = null;
+let planData = { weeks: {} };
+let currentView = 'plan';
+let currentWeekKey = getWeekKey(new Date());
+
+// ── WEEK UTILITIES ──
+function getWeekKey(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  return monday.toISOString().slice(0, 10);
+}
+
+function getWeekLabel(weekKey) {
+  const start = new Date(weekKey);
+  const end = new Date(weekKey);
+  end.setDate(end.getDate() + 6);
+  const opts = { day: 'numeric', month: 'short' };
+  return `Week of ${start.toLocaleDateString('en-AU', opts)} – ${end.toLocaleDateString('en-AU', { ...opts, year: 'numeric' })}`;
+}
+
+function changeWeek(dir) {
+  const d = new Date(currentWeekKey);
+  d.setDate(d.getDate() + dir * 7);
+  currentWeekKey = getWeekKey(d);
+  renderCurrentView();
+}
+
+function ensureWeek(key) {
+  if (!planData.weeks[key]) {
+    planData.weeks[key] = { availableHrs: 30, tasks: {}, rocks: [] };
+  }
+  return planData.weeks[key];
+}
+
+function getTaskKey(domain, text) {
+  return domain + '::' + text.slice(0, 50);
+}
+
+// ── GOOGLE DRIVE ──
+function gdriveConnect() {
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GDRIVE_CLIENT_ID,
+    scope: GDRIVE_SCOPE,
+    callback: async (resp) => {
+      if (resp.error) { setStatus('Error: ' + resp.error); return; }
+      gdriveToken = resp.access_token;
+      document.getElementById('gdrive-btn').textContent = '☁️ Connected';
+      document.getElementById('gdrive-btn').style.color = '#16a34a';
+      document.getElementById('connect-banner').style.display = 'none';
+      setStatus('Connected — loading data…');
+      await loadAllData();
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function gdriveFind(filename) {
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+trashed=false&fields=files(id)`,
+    { headers: { Authorization: `Bearer ${gdriveToken}` } }
+  );
+  const result = await r.json();
+  return result.files && result.files.length > 0 ? result.files[0].id : null;
+}
+
+async function gdriveRead(fileId) {
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers: { Authorization: `Bearer ${gdriveToken}` } }
+  );
+  return r.json();
+}
+
+async function gdriveWrite(fileId, filename, data) {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  if (fileId) {
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${gdriveToken}`, 'Content-Type': 'application/json' },
+      body: blob
+    });
+  } else {
+    const meta = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${gdriveToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: filename, mimeType: 'application/json' })
+    });
+    const m = await meta.json();
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${m.id}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${gdriveToken}`, 'Content-Type': 'application/json' },
+      body: blob
+    });
+    return m.id;
+  }
+  return fileId;
+}
+
+async function loadAllData() {
+  try {
+    tasksFileId = await gdriveFind(TASKS_FILENAME);
+    if (tasksFileId) {
+      tasksData = await gdriveRead(tasksFileId);
+      setStatus('Tasks loaded from TASKER ✓');
+    } else {
+      setStatus('brett-tasks.json not found — open TASKER first');
+    }
+    planFileId = await gdriveFind(PLAN_FILENAME);
+    if (planFileId) {
+      planData = await gdriveRead(planFileId);
+      setStatus('All data loaded ✓');
+    }
+    renderCurrentView();
+  } catch(e) {
+    setStatus('Load error: ' + e.message);
+  }
+}
+
+async function savePlan() {
+  if (!gdriveToken) { gdriveConnect(); return; }
+  try {
+    planFileId = await gdriveWrite(planFileId, PLAN_FILENAME, planData);
+    setStatus('Saved ✓ ' + new Date().toLocaleTimeString('en-AU'));
+  } catch(e) {
+    setStatus('Save error: ' + e.message);
+  }
+}
+
+function setStatus(msg) { document.getElementById('save-status').textContent = msg; }
+
+// ── VIEW SWITCHING ──
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.view-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['plan','review','history'][i] === view);
+  });
+  document.getElementById('plan-view').style.display = view === 'plan' ? 'block' : 'none';
+  document.getElementById('review-view').style.display = view === 'review' ? 'block' : 'none';
+  document.getElementById('history-view').style.display = view === 'history' ? 'block' : 'none';
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  document.getElementById('week-subtitle').textContent = getWeekLabel(currentWeekKey);
+  if (currentView === 'plan') renderPlan();
+  else if (currentView === 'review') renderReview();
+  else renderHistory();
+}
+
+// ── PLAN VIEW ──
+function renderPlan() {
+  const week = ensureWeek(currentWeekKey);
+  document.getElementById('plan-week-label').textContent = getWeekLabel(currentWeekKey);
+  document.getElementById('available-hrs').value = week.availableHrs || 30;
+  const content = document.getElementById('plan-content');
+  content.innerHTML = '';
+
+  if (!tasksData) {
+    content.innerHTML = '<div class="empty-state"><strong>No tasks loaded</strong>Connect Google Drive to load your tasks from TASKER</div>';
+    updateCapacity();
+    return;
+  }
+
+  tasksData.domains.forEach(domain => {
+    const activeTasks = domain.tasks.filter(t => t.state !== 2);
+    if (!activeTasks.length) return;
+
+    const accent = ACCENT[domain.label] || '#6B7280';
+    const section = document.createElement('div');
+    section.className = 'domain-section';
+
+    // Domain total
+    let domainTotal = 0;
+    activeTasks.forEach(t => {
+      const key = getTaskKey(domain.label, t.text);
+      domainTotal += parseFloat(week.tasks[key]?.estHrs || 0);
+    });
+
+    section.innerHTML = `
+      <div class="domain-header" style="border-left: 4px solid ${accent}; background: ${accent}10;">
+        <span class="domain-label" style="color:${accent}">${domain.label}</span>
+        <span class="domain-total">${domainTotal > 0 ? domainTotal + ' hrs planned' : ''}</span>
+      </div>
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th style="width:50%;">Task</th>
+            <th class="center" style="width:120px;">Hrs this week</th>
+            <th class="center" style="width:100px;">Big rock</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-plan-${domain.id}"></tbody>
+      </table>
+    `;
+    content.appendChild(section);
+
+    const tbody = document.getElementById(`tbody-plan-${domain.id}`);
+    activeTasks.forEach(task => {
+      const key = getTaskKey(domain.label, task.text);
+      const taskPlan = week.tasks[key] || {};
+      const isRock = (week.rocks || []).includes(key);
+
+      let tags = '';
+      if (task.hot) tags += '<span class="tag tag-hot">🔥 Hot</span>';
+      if (task.effort) tags += `<span class="tag tag-effort">${task.effort}</span>`;
+
+      const tr = document.createElement('tr');
+      tr.className = 'task-row' + (isRock ? ' big-rock' : '');
+      tr.dataset.key = key;
+      tr.innerHTML = `
+        <td>
+          <div class="task-name">${task.text}</div>
+          ${tags ? '<div class="task-tags">' + tags + '</div>' : ''}
+        </td>
+        <td style="text-align:center;">
+          <input type="number" class="hrs-input ${taskPlan.estHrs ? 'has-value' : ''}"
+            value="${taskPlan.estHrs || ''}" min="0" max="200" step="0.5"
+            placeholder="0" data-key="${key}" onchange="updateEstHrs(this)" />
+        </td>
+        <td style="text-align:center;">
+          <button class="rock-btn ${isRock ? 'active' : ''}" data-key="${key}" onclick="toggleRock(this)">
+            ${isRock ? '⬟ Big rock' : '◇ Flag'}
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+
+  updateCapacity();
+}
+
+function updateEstHrs(input) {
+  const week = ensureWeek(currentWeekKey);
+  const key = input.dataset.key;
+  if (!week.tasks[key]) week.tasks[key] = {};
+  week.tasks[key].estHrs = parseFloat(input.value) || 0;
+  input.classList.toggle('has-value', !!input.value);
+  updateCapacity();
+  updateDomainTotals();
+}
+
+function updateDomainTotals() {
+  if (!tasksData) return;
+  const week = ensureWeek(currentWeekKey);
+  tasksData.domains.forEach(domain => {
+    const activeTasks = domain.tasks.filter(t => t.state !== 2);
+    let total = 0;
+    activeTasks.forEach(t => {
+      const key = getTaskKey(domain.label, t.text);
+      total += parseFloat(week.tasks[key]?.estHrs || 0);
+    });
+    const header = document.querySelector(`#tbody-plan-${domain.id}`)?.closest('table')?.previousElementSibling?.querySelector('.domain-total');
+    if (header) header.textContent = total > 0 ? total + ' hrs planned' : '';
+  });
+}
+
+function toggleRock(btn) {
+  const week = ensureWeek(currentWeekKey);
+  if (!week.rocks) week.rocks = [];
+  const key = btn.dataset.key;
+  const idx = week.rocks.indexOf(key);
+  const row = btn.closest('.task-row');
+  if (idx >= 0) {
+    week.rocks.splice(idx, 1);
+    btn.classList.remove('active');
+    btn.textContent = '◇ Flag';
+    row.classList.remove('big-rock');
+  } else {
+    week.rocks.push(key);
+    btn.classList.add('active');
+    btn.textContent = '⬟ Big rock';
+    row.classList.add('big-rock');
+  }
+}
+
+function updateCapacity() {
+  const week = ensureWeek(currentWeekKey);
+  const available = parseFloat(document.getElementById('available-hrs')?.value || 30);
+  week.availableHrs = available;
+  let committed = 0;
+  Object.values(week.tasks).forEach(t => committed += parseFloat(t.estHrs || 0));
+  const pct = Math.min((committed / available) * 100, 100);
+  const fill = document.getElementById('capacity-fill');
+  const status = document.getElementById('capacity-status');
+  const committedEl = document.getElementById('committed-hrs');
+  if (!fill) return;
+  committedEl.textContent = committed;
+  fill.style.width = pct + '%';
+  let cls = 'green', color = 'var(--green)';
+  if (pct >= 100) { cls = 'red'; color = 'var(--red)'; }
+  else if (pct >= 80) { cls = 'amber'; color = 'var(--amber)'; }
+  fill.style.background = color;
+  status.className = 'capacity-status ' + cls;
+  const remaining = available - committed;
+  if (remaining < 0) {
+    status.textContent = `${committed} hrs committed — ${Math.abs(remaining)} hrs over capacity`;
+  } else {
+    status.textContent = `${committed} of ${available} hrs committed — ${remaining} hrs remaining`;
+  }
+}
+
+// ── REVIEW VIEW ──
+function renderReview() {
+  const week = ensureWeek(currentWeekKey);
+  document.getElementById('review-week-label').textContent = getWeekLabel(currentWeekKey);
+  const content = document.getElementById('review-content');
+  content.innerHTML = '';
+
+  if (!tasksData) {
+    content.innerHTML = '<div class="empty-state"><strong>No tasks loaded</strong>Connect Google Drive to load your tasks</div>';
+    renderReviewSummary(week);
+    return;
+  }
+
+  tasksData.domains.forEach(domain => {
+    const activeTasks = domain.tasks.filter(t => {
+      const key = getTaskKey(domain.label, t.text);
+      return week.tasks[key]?.estHrs > 0 || week.tasks[key]?.actHrs > 0;
+    });
+    if (!activeTasks.length) return;
+
+    const accent = ACCENT[domain.label] || '#6B7280';
+    const section = document.createElement('div');
+    section.className = 'domain-section';
+
+    // Domain summary
+    let domainEst = 0, domainAct = 0;
+    activeTasks.forEach(t => {
+      const key = getTaskKey(domain.label, t.text);
+      domainEst += parseFloat(week.tasks[key]?.estHrs || 0);
+      domainAct += parseFloat(week.tasks[key]?.actHrs || 0);
+    });
+
+    section.innerHTML = `
+      <div class="domain-header" style="border-left: 4px solid ${accent}; background: ${accent}10;">
+        <span class="domain-label" style="color:${accent}">${domain.label}</span>
+        <span class="domain-total">${domainEst}h est / ${domainAct}h actual</span>
+      </div>
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th style="width:45%;">Task</th>
+            <th class="center">Estimated</th>
+            <th class="center">Actual hrs</th>
+            <th class="center">Variance</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-review-${domain.id}"></tbody>
+      </table>
+    `;
+    content.appendChild(section);
+
+    const tbody = document.getElementById(`tbody-review-${domain.id}`);
+    activeTasks.forEach(task => {
+      const key = getTaskKey(domain.label, task.text);
+      const taskPlan = week.tasks[key] || {};
+      const est = parseFloat(taskPlan.estHrs || 0);
+      const act = parseFloat(taskPlan.actHrs || 0);
+
+      let variance = '', varClass = 'neutral';
+      if (act > 0 && est > 0) {
+        const diff = act - est;
+        const pct = Math.round((diff / est) * 100);
+        if (diff <= 0) { variance = '✓ On time'; varClass = 'green'; }
+        else if (pct <= 25) { variance = `+${diff.toFixed(1)}h`; varClass = 'amber'; }
+        else { variance = `+${diff.toFixed(1)}h (${pct}% over)`; varClass = 'red'; }
+      } else if (act > 0 && est === 0) {
+        variance = 'Unplanned'; varClass = 'amber';
+      }
+
+      const tr = document.createElement('tr');
+      tr.className = 'task-row';
+      tr.innerHTML = `
+        <td><div class="task-name">${task.text}</div></td>
+        <td style="text-align:center;font-family:'DM Mono',monospace;font-size:0.82rem;">${est > 0 ? est + 'h' : '—'}</td>
+        <td style="text-align:center;">
+          <input type="number" class="hrs-input ${taskPlan.actHrs ? 'has-value' : ''}"
+            value="${taskPlan.actHrs || ''}" min="0" max="200" step="0.5"
+            placeholder="0" data-key="${key}" onchange="updateActHrs(this)" />
+        </td>
+        <td style="text-align:center;">
+          ${variance ? `<span class="variance ${varClass}">${variance}</span>` : '<span style="color:var(--muted);font-size:0.75rem;">Enter actual</span>'}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+
+  renderReviewSummary(week);
+}
+
+function updateActHrs(input) {
+  const week = ensureWeek(currentWeekKey);
+  const key = input.dataset.key;
+  if (!week.tasks[key]) week.tasks[key] = {};
+  week.tasks[key].actHrs = parseFloat(input.value) || 0;
+  input.classList.toggle('has-value', !!input.value);
+  renderReviewSummary(week);
+}
+
+function renderReviewSummary(week) {
+  let totalEst = 0, totalAct = 0, taskCount = 0, overCount = 0;
+  Object.values(week.tasks).forEach(t => {
+    const est = parseFloat(t.estHrs || 0);
+    const act = parseFloat(t.actHrs || 0);
+    if (est > 0 || act > 0) {
+      totalEst += est; totalAct += act; taskCount++;
+      if (act > est * 1.25) overCount++;
+    }
+  });
+  const accuracy = totalEst > 0 && totalAct > 0
+    ? Math.round((1 - Math.abs(totalAct - totalEst) / totalEst) * 100)
+    : null;
+  const variance = totalAct - totalEst;
+  const varClass = variance <= 0 ? 'green' : variance <= totalEst * 0.15 ? 'amber' : 'red';
+
+  document.getElementById('review-summary').innerHTML = `
+    <div class="summary-card"><div class="summary-label">Estimated</div><div class="summary-value">${totalEst}h</div></div>
+    <div class="summary-card"><div class="summary-label">Actual</div><div class="summary-value">${totalAct}h</div></div>
+    <div class="summary-card"><div class="summary-label">Variance</div><div class="summary-value ${varClass}">${variance >= 0 ? '+' : ''}${variance.toFixed(1)}h</div></div>
+    <div class="summary-card"><div class="summary-label">Accuracy</div><div class="summary-value ${accuracy >= 85 ? 'green' : accuracy >= 70 ? 'amber' : 'red'}">${accuracy !== null ? accuracy + '%' : '—'}</div></div>
+  `;
+}
+
+// ── HISTORY VIEW ──
+function renderHistory() {
+  const content = document.getElementById('history-content');
+  const weeks = Object.entries(planData.weeks).sort((a, b) => b[0].localeCompare(a[0]));
+
+  if (!weeks.length) {
+    content.innerHTML = '<div class="empty-state"><strong>No history yet</strong>Complete your first weekly plan and review to start building your history</div>';
+    return;
+  }
+
+  let html = `<table class="history-table">
+    <thead>
+      <tr>
+        <th>Week</th>
+        <th>Available</th>
+        <th>Estimated</th>
+        <th>Actual</th>
+        <th>Variance</th>
+        <th>Accuracy</th>
+        <th>Big rocks</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  weeks.forEach(([key, week]) => {
+    let totalEst = 0, totalAct = 0;
+    Object.values(week.tasks || {}).forEach(t => {
+      totalEst += parseFloat(t.estHrs || 0);
+      totalAct += parseFloat(t.actHrs || 0);
+    });
+    const variance = totalAct - totalEst;
+    const accuracy = totalEst > 0 && totalAct > 0
+      ? Math.round((1 - Math.abs(variance) / totalEst) * 100)
+      : null;
+    const rocks = (week.rocks || []).length;
+    const varClass = variance <= 0 ? 'green' : variance <= totalEst * 0.15 ? 'amber' : 'red';
+    const accClass = !accuracy ? 'neutral' : accuracy >= 85 ? 'green' : accuracy >= 70 ? 'amber' : 'red';
+
+    html += `<tr>
+      <td style="font-weight:500;">${getWeekLabel(key)}</td>
+      <td style="font-family:'DM Mono',monospace;">${week.availableHrs || '—'}h</td>
+      <td style="font-family:'DM Mono',monospace;">${totalEst > 0 ? totalEst + 'h' : '—'}</td>
+      <td style="font-family:'DM Mono',monospace;">${totalAct > 0 ? totalAct + 'h' : '—'}</td>
+      <td><span class="variance ${varClass}">${totalAct > 0 ? (variance >= 0 ? '+' : '') + variance.toFixed(1) + 'h' : '—'}</span></td>
+      <td>${accuracy !== null ? `<span class="accuracy-pill ${accClass}" style="background:${accClass==='green'?'#f0fdf4':accClass==='amber'?'#fffbeb':'#fef2f2'};color:${accClass==='green'?'#16a34a':accClass==='amber'?'#d97706':'#dc2626'}">${accuracy}%</span>` : '—'}</td>
+      <td style="font-family:'DM Mono',monospace;">${rocks}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  content.innerHTML = html;
+}
+
+// ── INIT ──
+function init() {
+  currentWeekKey = getWeekKey(new Date());
+  document.getElementById('week-subtitle').textContent = getWeekLabel(currentWeekKey);
+
+  // Show connect banner if not connected
+  if (!gdriveToken) {
+    document.getElementById('connect-banner').style.display = 'block';
+  }
+  renderCurrentView();
+}
+
+init();
+</script>
+</body>
+</html>
