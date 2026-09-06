@@ -456,6 +456,7 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
     <label>Task description *</label><input type="text" id="input-task" placeholder="What needs to be done?" />
     <label>Effort estimate</label><input type="text" id="input-effort" placeholder="e.g. 2 hrs" />
     <label>Others involved</label><input type="text" id="input-others" placeholder="e.g. Andrew F" />
+    <label>Due date</label><input type="date" id="input-due" />
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-confirm" id="modal-confirm-btn" onclick="confirmAdd()">Add task</button>
@@ -858,15 +859,15 @@ function openModal(di) {
   document.getElementById('modal-title').textContent=`Add task to ${data.domains[di].label}`;
   document.getElementById('modal-title').style.color=accent;
   document.getElementById('modal-confirm-btn').style.background=accent;
-  ['input-task','input-effort','input-others'].forEach(id=>document.getElementById(id).value='');
+  ['input-task','input-effort','input-others','input-due'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('modal').classList.add('open');
   setTimeout(()=>document.getElementById('input-task').focus(),50);
 }
 function closeModal(){document.getElementById('modal').classList.remove('open');}
 function confirmAdd() {
   const text=document.getElementById('input-task').value.trim();if(!text){document.getElementById('input-task').focus();return;}
-  const effort=document.getElementById('input-effort').value.trim();const others=document.getElementById('input-others').value.trim();
-  data.domains[pendingModalDi].tasks.push({text,state:0,hot:false,today:false,notes:'',effort,others,due:'',repeat:'',subtasks:[],completedAt:null});
+  const effort=document.getElementById('input-effort').value.trim();const others=document.getElementById('input-others').value.trim();const due=document.getElementById('input-due').value;
+  data.domains[pendingModalDi].tasks.push({text,state:0,hot:false,today:false,notes:'',effort,others,due,repeat:'',subtasks:[],completedAt:null});
   closeModal();render();updateSummary();markUnsaved();
 }
 document.addEventListener('keydown',e=>{
